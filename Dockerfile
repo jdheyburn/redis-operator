@@ -1,35 +1,31 @@
-FROM golang:1.13.3-alpine as go-builder
+# Build the manager binary
+FROM golang:1.16 as builder
 
-RUN apk update && apk upgrade && \
-    apk add --no-cache ca-certificates git mercurial
+WORKDIR /workspace
+# Copy the Go Modules manifests
+COPY go.mod go.mod
+COPY go.sum go.sum
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+RUN go mod download
 
-ARG PROJECT_NAME=redis-operator
-ARG REPO_PATH=github.com/ucloud/$PROJECT_NAME
-ARG BUILD_PATH=${REPO_PATH}/cmd/manager
+# Copy the go source
+COPY main.go main.go
+COPY api/ api/
+COPY controllers/ controllers/
+# JH: I added below
+COPY client/ client/
+COPY metrics/ metrics/
+COPY util/ util/
 
-# Build version and commit should be passed in when performing docker build
-ARG VERSION=0.1.1
-ARG GIT_SHA=0000000
+# Build
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager main.go
 
-WORKDIR /src
+# Use distroless as minimal base image to package the manager binary
+# Refer to https://github.com/GoogleContainerTools/distroless for more details
+FROM gcr.io/distroless/static:nonroot
+WORKDIR /
+COPY --from=builder /workspace/manager .
+USER 65532:65532
 
-COPY go.mod ./ go.sum ./
-RUN GOPROXY=https://goproxy.cn,direct go mod download
-
-COPY pkg ./ cmd ./ version ./
-
-RUN GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o ${GOBIN}/${PROJECT_NAME} \
-    -ldflags "-X ${REPO_PATH}/pkg/version.Version=${VERSION} -X ${REPO_PATH}/pkg/version.GitSHA=${GIT_SHA}" \
-    $BUILD_PATH
-
-# =============================================================================
-FROM alpine:3.9 AS final
-
-ARG PROJECT_NAME=redis-operator
-
-COPY --from=go-builder ${GOBIN}/${PROJECT_NAME} /usr/local/bin/${PROJECT_NAME}
-
-RUN adduser -D ${PROJECT_NAME}
-USER ${PROJECT_NAME}
-
-ENTRYPOINT ["/usr/local/bin/redis-operator"]
+ENTRYPOINT ["/manager"]

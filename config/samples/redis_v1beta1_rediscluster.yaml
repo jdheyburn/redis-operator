@@ -1,0 +1,23 @@
+apiVersion: redis.kun/v1beta1
+kind: RedisCluster
+metadata:
+  name: rediscluster-sample
+  namespace: redis
+spec:
+  # Add fields here
+    size: 3
+    image: redis:5.0.4-alpine
+    resources:
+      limits:
+        cpu: 400m
+        memory: 300Mi
+      requests:
+        cpu: 100m
+        memory: 50Mi
+    config:
+      maxmemory: "4294967296"
+      maxmemory-policy: volatile-lru
+      min-replicas-max-lag: "5"
+      min-replicas-to-write: "1"
+      repl-diskless-sync: "yes"
+      save: "900 1"
