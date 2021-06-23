@@ -16,6 +16,7 @@ type Services interface {
 	Deployment
 	StatefulSet
 	Cluster
+	Secret
 }
 
 type services struct {
@@ -27,6 +28,7 @@ type services struct {
 	Deployment
 	StatefulSet
 	Cluster
+	Secret
 }
 
 // New returns a new Kubernetes client set.
@@ -40,5 +42,6 @@ func New(kubecli client.Client, logger logr.Logger) Services {
 		Deployment:          NewDeployment(kubecli, logger),
 		StatefulSet:         NewStatefulSet(kubecli, logger),
 		Cluster:             NewCluster(kubecli, logger),
+		Secret:              NewSecret(kubecli, logger),
 	}
 }

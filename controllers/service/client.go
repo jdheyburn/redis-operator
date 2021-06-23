@@ -64,7 +64,14 @@ func (r *RedisClusterKubeClient) EnsureSentinelHeadlessService(rc *redisv1beta1.
 
 // EnsureSentinelConfigMap makes sure the sentinel configmap exists
 func (r *RedisClusterKubeClient) EnsureSentinelConfigMap(rc *redisv1beta1.RedisCluster, labels map[string]string, ownerRefs []metav1.OwnerReference) error {
-	cm := generateSentinelConfigMap(rc, labels, ownerRefs)
+
+	redisPassword, err := k8s.GetRedisPassword(r.K8SService, rc)
+
+	if err != nil {
+		return err
+	}
+
+	cm := generateSentinelConfigMap(rc, labels, ownerRefs, redisPassword)
 	return r.K8SService.CreateIfNotExistsConfigMap(rc.Namespace, cm)
 }
 
@@ -161,7 +168,14 @@ func shouldUpdateRedis(expectResource, containterResource corev1.ResourceRequire
 
 // EnsureRedisConfigMap makes sure the sentinel configmap exists
 func (r *RedisClusterKubeClient) EnsureRedisConfigMap(rc *redisv1beta1.RedisCluster, labels map[string]string, ownerRefs []metav1.OwnerReference) error {
-	cm := generateRedisConfigMap(rc, labels, ownerRefs)
+
+	redisPassword, err := k8s.GetRedisPassword(r.K8SService, rc)
+
+	if err != nil {
+		return err
+	}
+
+	cm := generateRedisConfigMap(rc, labels, ownerRefs, redisPassword)
 	return r.K8SService.CreateIfNotExistsConfigMap(rc.Namespace, cm)
 }
 

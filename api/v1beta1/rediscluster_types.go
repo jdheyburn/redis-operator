@@ -19,7 +19,7 @@ type RedisClusterSpec struct {
 	Command            []string                      `json:"command,omitempty"`
 	ShutdownConfigMap  string                        `json:"shutdownConfigMap,omitempty"`
 	Storage            RedisStorage                  `json:"storage,omitempty"`
-	Password           string                        `json:"password,omitempty"`
+	Auth               AuthSettings                  `json:"auth,omitempty"`
 	Exporter           RedisExporter                 `json:"exporter,omitempty"`
 	Affinity           *corev1.Affinity              `json:"affinity,omitempty"`
 	SecurityContext    *corev1.PodSecurityContext    `json:"securityContext,omitempty"`
@@ -80,6 +80,11 @@ type SentinelSettings struct {
 	ToleRations      []corev1.Toleration           `json:"tolerations,omitempty"`
 	NodeSelector     map[string]string             `json:"nodeSelector,omitempty"`
 	Annotations      map[string]string             `json:"annotations,omitempty"`
+}
+
+// AuthSettings contains settings about Redis and Sentinel authentication
+type AuthSettings struct {
+	SecretPath string `json:"secretPath,omitempty"`
 }
 
 // RedisStorage defines the structure used to store the Redis Data

@@ -21,16 +21,16 @@ type RedisClusterCheck interface {
 	CheckRedisNumber(redisCluster *redisv1beta1.RedisCluster) error
 	CheckSentinelNumber(redisCluster *redisv1beta1.RedisCluster) error
 	CheckSentinelReadyReplicas(redisCluster *redisv1beta1.RedisCluster) error
-	CheckAllSlavesFromMaster(master string, redisCluster *redisv1beta1.RedisCluster, auth *util.AuthConfig) error
-	CheckSentinelNumberInMemory(sentinel string, redisCluster *redisv1beta1.RedisCluster, auth *util.AuthConfig) error
-	CheckSentinelSlavesNumberInMemory(sentinel string, redisCluster *redisv1beta1.RedisCluster, auth *util.AuthConfig) error
-	CheckSentinelMonitor(sentinel string, monitor string, auth *util.AuthConfig) error
-	GetMasterIP(redisCluster *redisv1beta1.RedisCluster, auth *util.AuthConfig) (string, error)
-	GetNumberMasters(redisCluster *redisv1beta1.RedisCluster, auth *util.AuthConfig) (int, error)
-	GetRedisesIPs(redisCluster *redisv1beta1.RedisCluster, auth *util.AuthConfig) ([]string, error)
+	CheckAllSlavesFromMaster(master string, redisCluster *redisv1beta1.RedisCluster) error
+	CheckSentinelNumberInMemory(sentinel string, redisCluster *redisv1beta1.RedisCluster) error
+	CheckSentinelSlavesNumberInMemory(sentinel string, redisCluster *redisv1beta1.RedisCluster) error
+	CheckSentinelMonitor(sentinel string, monitor string, redisCluster *redisv1beta1.RedisCluster) error
+	GetMasterIP(redisCluster *redisv1beta1.RedisCluster) (string, error)
+	GetNumberMasters(redisCluster *redisv1beta1.RedisCluster) (int, error)
+	GetRedisesIPs(redisCluster *redisv1beta1.RedisCluster) ([]string, error)
 	GetSentinelsIPs(redisCluster *redisv1beta1.RedisCluster) ([]string, error)
 	GetMinimumRedisPodTime(redisCluster *redisv1beta1.RedisCluster) (time.Duration, error)
-	CheckRedisConfig(redisCluster *redisv1beta1.RedisCluster, addr string, auth *util.AuthConfig) error
+	CheckRedisConfig(redisCluster *redisv1beta1.RedisCluster, addr string) error
 }
 
 var parseConfigMap = map[string]int8{
@@ -68,10 +68,15 @@ func NewRedisClusterChecker(k8sService k8s.Services, redisClient redis.Client, l
 }
 
 // CheckRedisConfig check current redis config is same as custom config
-func (r *RedisClusterChecker) CheckRedisConfig(redisCluster *redisv1beta1.RedisCluster, addr string, auth *util.AuthConfig) error {
+func (r *RedisClusterChecker) CheckRedisConfig(redisCluster *redisv1beta1.RedisCluster, addr string) error {
+	password, err := k8s.GetRedisPassword(r.k8sService, redisCluster)
+	if err != nil {
+		return err
+	}
+
 	client := goredis.NewClient(&goredis.Options{
 		Addr:     net.JoinHostPort(addr, "6379"),
-		Password: auth.Password,
+		Password: password,
 		DB:       0,
 	})
 	defer client.Close()
@@ -136,13 +141,19 @@ func (r *RedisClusterChecker) CheckSentinelReadyReplicas(rc *redisv1beta1.RedisC
 }
 
 // CheckAllSlavesFromMaster controls that all slaves have the same master (the real one)
-func (r *RedisClusterChecker) CheckAllSlavesFromMaster(master string, rc *redisv1beta1.RedisCluster, auth *util.AuthConfig) error {
-	rips, err := r.GetRedisesIPs(rc, auth)
+func (r *RedisClusterChecker) CheckAllSlavesFromMaster(master string, rc *redisv1beta1.RedisCluster) error {
+	rips, err := r.GetRedisesIPs(rc)
 	if err != nil {
 		return err
 	}
+
+	password, err := k8s.GetRedisPassword(r.k8sService, rc)
+	if err != nil {
+		return err
+	}
+
 	for _, rip := range rips {
-		slave, err := r.redisClient.GetSlaveMasterIP(rip, auth)
+		slave, err := r.redisClient.GetSlaveMasterIP(rip, password)
 		if err != nil {
 			return err
 		}
@@ -154,8 +165,13 @@ func (r *RedisClusterChecker) CheckAllSlavesFromMaster(master string, rc *redisv
 }
 
 // CheckSentinelNumberInMemory controls that sentinels have only the living sentinels on its memory.
-func (r *RedisClusterChecker) CheckSentinelNumberInMemory(sentinel string, rc *redisv1beta1.RedisCluster, auth *util.AuthConfig) error {
-	nSentinels, err := r.redisClient.GetNumberSentinelsInMemory(sentinel, auth)
+func (r *RedisClusterChecker) CheckSentinelNumberInMemory(sentinel string, rc *redisv1beta1.RedisCluster) error {
+	password, err := k8s.GetRedisPassword(r.k8sService, rc)
+	if err != nil {
+		return err
+	}
+
+	nSentinels, err := r.redisClient.GetNumberSentinelsInMemory(sentinel, password)
 	if err != nil {
 		return err
 	} else if nSentinels != rc.Spec.Sentinel.Replicas {
@@ -165,8 +181,14 @@ func (r *RedisClusterChecker) CheckSentinelNumberInMemory(sentinel string, rc *r
 }
 
 // CheckSentinelSlavesNumberInMemory controls that sentinels have only the spected slaves number.
-func (r *RedisClusterChecker) CheckSentinelSlavesNumberInMemory(sentinel string, rc *redisv1beta1.RedisCluster, auth *util.AuthConfig) error {
-	nSlaves, err := r.redisClient.GetNumberSentinelSlavesInMemory(sentinel, auth)
+func (r *RedisClusterChecker) CheckSentinelSlavesNumberInMemory(sentinel string, rc *redisv1beta1.RedisCluster) error {
+
+	password, err := k8s.GetRedisPassword(r.k8sService, rc)
+	if err != nil {
+		return err
+	}
+
+	nSlaves, err := r.redisClient.GetNumberSentinelSlavesInMemory(sentinel, password)
 	if err != nil {
 		return err
 	} else if nSlaves != rc.Spec.Size-1 {
@@ -176,8 +198,14 @@ func (r *RedisClusterChecker) CheckSentinelSlavesNumberInMemory(sentinel string,
 }
 
 // CheckSentinelMonitor controls if the sentinels are monitoring the expected master
-func (r *RedisClusterChecker) CheckSentinelMonitor(sentinel string, monitor string, auth *util.AuthConfig) error {
-	actualMonitorIP, err := r.redisClient.GetSentinelMonitor(sentinel, auth)
+func (r *RedisClusterChecker) CheckSentinelMonitor(sentinel string, monitor string, rc *redisv1beta1.RedisCluster) error {
+
+	password, err := k8s.GetRedisPassword(r.k8sService, rc)
+	if err != nil {
+		return err
+	}
+
+	actualMonitorIP, err := r.redisClient.GetSentinelMonitor(sentinel, password)
 	if err != nil {
 		return err
 	}
@@ -188,14 +216,20 @@ func (r *RedisClusterChecker) CheckSentinelMonitor(sentinel string, monitor stri
 }
 
 // GetMasterIP connects to all redis and returns the master of the redis cluster
-func (r *RedisClusterChecker) GetMasterIP(rc *redisv1beta1.RedisCluster, auth *util.AuthConfig) (string, error) {
-	rips, err := r.GetRedisesIPs(rc, auth)
+func (r *RedisClusterChecker) GetMasterIP(rc *redisv1beta1.RedisCluster) (string, error) {
+	rips, err := r.GetRedisesIPs(rc)
 	if err != nil {
 		return "", err
 	}
+
+	password, err := k8s.GetRedisPassword(r.k8sService, rc)
+	if err != nil {
+		return "", err
+	}
+
 	masters := []string{}
 	for _, rip := range rips {
-		master, err := r.redisClient.IsMaster(rip, auth)
+		master, err := r.redisClient.IsMaster(rip, password)
 		if err != nil {
 			return "", err
 		}
@@ -211,14 +245,20 @@ func (r *RedisClusterChecker) GetMasterIP(rc *redisv1beta1.RedisCluster, auth *u
 }
 
 // GetNumberMasters returns the number of redis nodes that are working as a master
-func (r *RedisClusterChecker) GetNumberMasters(rc *redisv1beta1.RedisCluster, auth *util.AuthConfig) (int, error) {
+func (r *RedisClusterChecker) GetNumberMasters(rc *redisv1beta1.RedisCluster) (int, error) {
 	nMasters := 0
-	rips, err := r.GetRedisesIPs(rc, auth)
+
+	password, err := k8s.GetRedisPassword(r.k8sService, rc)
+	if err != nil {
+		return nMasters, err
+	}
+
+	rips, err := r.GetRedisesIPs(rc)
 	if err != nil {
 		return nMasters, err
 	}
 	for _, rip := range rips {
-		master, err := r.redisClient.IsMaster(rip, auth)
+		master, err := r.redisClient.IsMaster(rip, password)
 		if err != nil {
 			return nMasters, err
 		}
@@ -230,7 +270,7 @@ func (r *RedisClusterChecker) GetNumberMasters(rc *redisv1beta1.RedisCluster, au
 }
 
 // GetRedisesIPs returns the IPs of the Redis nodes
-func (r *RedisClusterChecker) GetRedisesIPs(rc *redisv1beta1.RedisCluster, auth *util.AuthConfig) ([]string, error) {
+func (r *RedisClusterChecker) GetRedisesIPs(rc *redisv1beta1.RedisCluster) ([]string, error) {
 	redises := []string{}
 	rps, err := r.k8sService.GetStatefulSetPods(rc.Namespace, util.GetRedisName(rc))
 	if err != nil {
