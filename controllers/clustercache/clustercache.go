@@ -33,10 +33,8 @@ type Meta struct {
 }
 
 func newCluster(rc *redisv1beta1.RedisCluster) *Meta {
+
 	return &Meta{
-		Auth: &util.AuthConfig{
-			Password: rc.Spec.Password,
-		},
 		Status:    redisv1beta1.ClusterConditionCreating,
 		Config:    rc.Spec.Config,
 		Obj:       rc,
@@ -86,8 +84,8 @@ func (c *MetaMap) Update(meta *Meta, new *redisv1beta1.RedisCluster) {
 	meta.State = Update
 	meta.Size = old.Spec.Size
 	// Password change is not allowed
-	new.Spec.Password = old.Spec.Password
-	meta.Auth.Password = old.Spec.Password
+	new.Spec.Auth.SecretPath = old.Spec.Auth.SecretPath
+	// meta.Auth.Password = old.Spec.Password
 	meta.Obj = new
 
 	meta.Status = redisv1beta1.ClusterConditionUpdating

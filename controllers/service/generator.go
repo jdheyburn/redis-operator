@@ -80,7 +80,7 @@ func generateRedisService(rc *redisv1beta1.RedisCluster, labels map[string]strin
 	}
 }
 
-func generateSentinelConfigMap(rc *redisv1beta1.RedisCluster, labels map[string]string, ownerRefs []metav1.OwnerReference) *corev1.ConfigMap {
+func generateSentinelConfigMap(rc *redisv1beta1.RedisCluster, labels map[string]string, ownerRefs []metav1.OwnerReference, redisPassword string) *corev1.ConfigMap {
 	name := util.GetSentinelName(rc)
 	namespace := rc.Namespace
 
@@ -90,8 +90,8 @@ sentinel down-after-milliseconds mymaster 1000
 sentinel failover-timeout mymaster 3000
 sentinel parallel-syncs mymaster 2`
 
-	if rc.Spec.Password != "" {
-		sentinelConfigFileContent = fmt.Sprintf("%s\nsentinel auth-pass mymaster %s\n", sentinelConfigFileContent, rc.Spec.Password)
+	if redisPassword != "" {
+		sentinelConfigFileContent = fmt.Sprintf("%s\nsentinel auth-pass mymaster %s\n", sentinelConfigFileContent, redisPassword)
 	}
 
 	return &corev1.ConfigMap{
@@ -107,7 +107,7 @@ sentinel parallel-syncs mymaster 2`
 	}
 }
 
-func generateRedisConfigMap(rc *redisv1beta1.RedisCluster, labels map[string]string, ownerRefs []metav1.OwnerReference) *corev1.ConfigMap {
+func generateRedisConfigMap(rc *redisv1beta1.RedisCluster, labels map[string]string, ownerRefs []metav1.OwnerReference, redisPassword string) *corev1.ConfigMap {
 	name := util.GetRedisName(rc)
 	namespace := rc.Namespace
 
@@ -116,8 +116,8 @@ func generateRedisConfigMap(rc *redisv1beta1.RedisCluster, labels map[string]str
 tcp-keepalive 60
 save 900 1
 save 300 10`
-	if rc.Spec.Password != "" {
-		redisConfigFileContent = fmt.Sprintf("%s\nrequirepass %s\nmasterauth %s\n", redisConfigFileContent, rc.Spec.Password, rc.Spec.Password)
+	if redisPassword != "" {
+		redisConfigFileContent = fmt.Sprintf("%s\nrequirepass %s\nmasterauth %s\n", redisConfigFileContent, redisPassword, redisPassword)
 	}
 
 	return &corev1.ConfigMap{
@@ -214,8 +214,8 @@ func generateRedisStatefulSet(rc *redisv1beta1.RedisCluster, labels map[string]s
 	volumes := getRedisVolumes(rc)
 
 	probeArg := "redis-cli -h $(hostname)"
-	if spec.Password != "" {
-		probeArg = fmt.Sprintf("%s -a '%s' ping", probeArg, spec.Password)
+	if spec.Auth.SecretPath != "" {
+		probeArg = fmt.Sprintf("%s -a \"${REDIS_PASSWORD}\" ping", probeArg)
 	} else {
 		probeArg = fmt.Sprintf("%s ping", probeArg)
 	}
@@ -243,7 +243,7 @@ func generateRedisStatefulSet(rc *redisv1beta1.RedisCluster, labels map[string]s
 				},
 				Spec: corev1.PodSpec{
 					Affinity:         getAffinity(rc.Spec.Affinity, labels),
-					Tolerations:      rc.Spec.ToleRations,
+					Tolerations:      rc.Spec.Tolerations,
 					NodeSelector:     rc.Spec.NodeSelector,
 					SecurityContext:  getSecurityContext(rc.Spec.SecurityContext),
 					ImagePullSecrets: rc.Spec.ImagePullSecrets,
@@ -318,6 +318,20 @@ func generateRedisStatefulSet(rc *redisv1beta1.RedisCluster, labels map[string]s
 		ss.Spec.Template.Spec.Containers = append(ss.Spec.Template.Spec.Containers, exporter)
 	}
 
+	if rc.Spec.Auth.SecretPath != "" {
+		ss.Spec.Template.Spec.Containers[0].Env = append(ss.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+			Name: "REDIS_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: rc.Spec.Auth.SecretPath,
+					},
+					Key: "password",
+				},
+			},
+		})
+	}
+
 	return ss
 }
 
@@ -350,7 +364,7 @@ func generateSentinelStatefulSet(rc *redisv1beta1.RedisCluster, labels map[strin
 				},
 				Spec: corev1.PodSpec{
 					Affinity:         getAffinity(rc.Spec.Sentinel.Affinity, labels),
-					Tolerations:      rc.Spec.Sentinel.ToleRations,
+					Tolerations:      rc.Spec.Sentinel.Tolerations,
 					NodeSelector:     rc.Spec.Sentinel.NodeSelector,
 					SecurityContext:  getSecurityContext(rc.Spec.Sentinel.SecurityContext),
 					ImagePullSecrets: rc.Spec.Sentinel.ImagePullSecrets,
@@ -534,10 +548,17 @@ func createRedisExporterContainer(rc *redisv1beta1.RedisCluster) corev1.Containe
 			},
 		},
 	}
-	if rc.Spec.Password != "" {
+	if rc.Spec.Auth.SecretPath != "" {
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  redisPasswordEnv,
-			Value: rc.Spec.Password,
+			Name: "REDIS_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: rc.Spec.Auth.SecretPath,
+					},
+					Key: "password",
+				},
+			},
 		})
 	}
 	return container
