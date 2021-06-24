@@ -16,6 +16,7 @@ import (
 )
 
 const (
+	redisConfigurationVolumeName         = "redis-config"
 	redisShutdownConfigurationVolumeName = "redis-shutdown-config"
 	redisStorageVolumeName               = "redis-data"
 
@@ -230,7 +231,7 @@ func generateRedisStatefulSet(rc *redisv1beta1.RedisCluster, labels map[string]s
 			ServiceName: name,
 			Replicas:    &spec.Size,
 			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
-				Type: "RollingUpdate",
+				Type: appsv1.OnDeleteStatefulSetStrategyType,
 			},
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
@@ -608,10 +609,10 @@ func getQuorum(rc *redisv1beta1.RedisCluster) int32 {
 
 func getRedisVolumeMounts(rc *redisv1beta1.RedisCluster) []corev1.VolumeMount {
 	volumeMounts := []corev1.VolumeMount{
-		//{
-		//	Name:      redisConfigurationVolumeName,
-		//	MountPath: "/redis",
-		//},
+		{
+			Name:      redisConfigurationVolumeName,
+			MountPath: "/redis",
+		},
 		{
 			Name:      redisShutdownConfigurationVolumeName,
 			MountPath: "/redis-shutdown",
@@ -626,10 +627,21 @@ func getRedisVolumeMounts(rc *redisv1beta1.RedisCluster) []corev1.VolumeMount {
 }
 
 func getRedisVolumes(rc *redisv1beta1.RedisCluster) []corev1.Volume {
+	configMapName := util.GetRedisName(rc)
 	shutdownConfigMapName := util.GetRedisShutdownConfigMapName(rc)
 
 	executeMode := int32(0744)
 	volumes := []corev1.Volume{
+		{
+			Name: redisConfigurationVolumeName,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: configMapName,
+					},
+				},
+			},
+		},
 		{
 			Name: redisShutdownConfigurationVolumeName,
 			VolumeSource: corev1.VolumeSource{
@@ -690,20 +702,10 @@ func getRedisCommand(rc *redisv1beta1.RedisCluster) []string {
 		return rc.Spec.Command
 	}
 
-	cmds := []string{
+	return []string{
 		"redis-server",
-		"--slaveof 127.0.0.1 6379",
-		"--tcp-keepalive 60",
-		"--save 900 1",
-		"--save 300 10",
+		fmt.Sprintf("/redis/%s", util.RedisConfigFileName),
 	}
-
-	if rc.Spec.Password != "" {
-		cmds = append(cmds, fmt.Sprintf("--requirepass '%s'", rc.Spec.Password),
-			fmt.Sprintf("--masterauth '%s'", rc.Spec.Password))
-	}
-
-	return cmds
 }
 
 func getSentinelCommand(rc *redisv1beta1.RedisCluster) []string {
