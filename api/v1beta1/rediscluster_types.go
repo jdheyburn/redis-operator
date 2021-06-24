@@ -23,7 +23,7 @@ type RedisClusterSpec struct {
 	Exporter           RedisExporter                 `json:"exporter,omitempty"`
 	Affinity           *corev1.Affinity              `json:"affinity,omitempty"`
 	SecurityContext    *corev1.PodSecurityContext    `json:"securityContext,omitempty"`
-	ToleRations        []corev1.Toleration           `json:"toleRations,omitempty"`
+	Tolerations        []corev1.Toleration           `json:"tolerations,omitempty"`
 	NodeSelector       map[string]string             `json:"nodeSelector,omitempty"`
 	Config             map[string]string             `json:"config,omitempty"`
 	Annotations        map[string]string             `json:"annotations,omitempty"`
@@ -77,7 +77,7 @@ type SentinelSettings struct {
 	Command          []string                      `json:"command,omitempty"`
 	Affinity         *corev1.Affinity              `json:"affinity,omitempty"`
 	SecurityContext  *corev1.PodSecurityContext    `json:"securityContext,omitempty"`
-	ToleRations      []corev1.Toleration           `json:"tolerations,omitempty"`
+	Tolerations      []corev1.Toleration           `json:"tolerations,omitempty"`
 	NodeSelector     map[string]string             `json:"nodeSelector,omitempty"`
 	Annotations      map[string]string             `json:"annotations,omitempty"`
 }

@@ -142,8 +142,8 @@ func (in *RedisClusterSpec) DeepCopyInto(out *RedisClusterSpec) {
 		*out = new(v1.PodSecurityContext)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.ToleRations != nil {
-		in, out := &in.ToleRations, &out.ToleRations
+	if in.Tolerations != nil {
+		in, out := &in.Tolerations, &out.Tolerations
 		*out = make([]v1.Toleration, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
@@ -274,8 +274,8 @@ func (in *SentinelSettings) DeepCopyInto(out *SentinelSettings) {
 		*out = new(v1.PodSecurityContext)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.ToleRations != nil {
-		in, out := &in.ToleRations, &out.ToleRations
+	if in.Tolerations != nil {
+		in, out := &in.Tolerations, &out.Tolerations
 		*out = make([]v1.Toleration, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])

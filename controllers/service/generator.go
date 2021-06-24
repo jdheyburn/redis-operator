@@ -243,7 +243,7 @@ func generateRedisStatefulSet(rc *redisv1beta1.RedisCluster, labels map[string]s
 				},
 				Spec: corev1.PodSpec{
 					Affinity:         getAffinity(rc.Spec.Affinity, labels),
-					Tolerations:      rc.Spec.ToleRations,
+					Tolerations:      rc.Spec.Tolerations,
 					NodeSelector:     rc.Spec.NodeSelector,
 					SecurityContext:  getSecurityContext(rc.Spec.SecurityContext),
 					ImagePullSecrets: rc.Spec.ImagePullSecrets,
@@ -364,7 +364,7 @@ func generateSentinelStatefulSet(rc *redisv1beta1.RedisCluster, labels map[strin
 				},
 				Spec: corev1.PodSpec{
 					Affinity:         getAffinity(rc.Spec.Sentinel.Affinity, labels),
-					Tolerations:      rc.Spec.Sentinel.ToleRations,
+					Tolerations:      rc.Spec.Sentinel.Tolerations,
 					NodeSelector:     rc.Spec.Sentinel.NodeSelector,
 					SecurityContext:  getSecurityContext(rc.Spec.Sentinel.SecurityContext),
 					ImagePullSecrets: rc.Spec.Sentinel.ImagePullSecrets,

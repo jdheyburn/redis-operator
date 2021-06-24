@@ -631,6 +631,13 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
+              auth:
+                description: AuthSettings contains settings about Redis and Sentinel
+                  authentication
+                properties:
+                  secretPath:
+                    type: string
+                type: object
               command:
                 items:
                   type: string
@@ -675,8 +682,6 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
-              password:
-                type: string
               resources:
                 description: ResourceRequirements describes the compute resource requirements.
                 properties:
@@ -1968,7 +1973,7 @@ spec:
                         type: object
                     type: object
                 type: object
-              toleRations:
+              tolerations:
                 items:
                   description: The pod this Toleration is attached to tolerates any
                     taint that matches the triple <key,value,effect> using the matching

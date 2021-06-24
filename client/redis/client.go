@@ -135,6 +135,7 @@ func isSentinelReady(info string) error {
 
 // ResetSentinel sends a sentinel reset * for the given sentinel
 func (c *client) ResetSentinel(ip string, password string) error {
+	// setOptions ignores the password, assume that Sentinel is unauthed
 	options := c.setOptions(ip, sentinelPort, password)
 	rClient := rediscli.NewClient(options)
 	defer rClient.Close()
