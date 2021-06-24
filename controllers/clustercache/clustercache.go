@@ -85,7 +85,6 @@ func (c *MetaMap) Update(meta *Meta, new *redisv1beta1.RedisCluster) {
 	meta.Size = old.Spec.Size
 	// Password change is not allowed
 	new.Spec.Auth.SecretPath = old.Spec.Auth.SecretPath
-	// meta.Auth.Password = old.Spec.Password
 	meta.Obj = new
 
 	meta.Status = redisv1beta1.ClusterConditionUpdating
